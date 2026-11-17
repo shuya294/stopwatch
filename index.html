@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ストップウォッチ</title>
+  <style>
+    :root {
+      --bg: #f6f5f2; --fg: #1d1d1f; --muted: #6e6e73; --card: #ffffff;
+      --line: #e3e1dc; --accent: #1f7a5a; --danger: #c2412d;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #151515; --fg: #f2f2f2; --muted: #9a9a9f; --card: #1f1f1f;
+              --line: #2e2e2e; --accent: #3fbf8c; --danger: #ef6a54; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg);
+      font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      display: flex; justify-content: center; padding: 48px 16px;
+    }
+    main { width: 100%; max-width: 440px; }
+    h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0 0 24px; letter-spacing: .05em; }
+    .time {
+      font-variant-numeric: tabular-nums; font-size: clamp(48px, 16vw, 76px);
+      font-weight: 300; text-align: center; margin: 0 0 32px; letter-spacing: -.02em;
+    }
+    .time small { font-size: .5em; color: var(--muted); }
+    .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button {
+      font: inherit; font-size: 17px; font-weight: 600; padding: 16px; border-radius: 14px;
+      border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer;
+    }
+    button:disabled { opacity: .4; cursor: default; }
+    #toggle { background: var(--accent); border-color: var(--accent); color: #fff; }
+    #toggle.running { background: var(--danger); border-color: var(--danger); }
+    ol { list-style: none; padding: 0; margin: 28px 0 0; }
+    li {
+      display: flex; justify-content: space-between; padding: 12px 4px;
+      border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums;
+    }
+    li span:first-child { color: var(--muted); }
+    .hint { margin-top: 24px; font-size: 13px; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>STOPWATCH</h1>
+    <div class="time" id="time">00:00<small>.00</small></div>
+    <div class="buttons">
+      <button id="lap" disabled>ラップ</button>
+      <button id="toggle">スタート</button>
+    </div>
+    <ol id="laps"></ol>
+    <p class="hint">Space: スタート / ストップ ・ L: ラップ ・ R: リセット</p>
+  </main>
+  <script>
+    const timeEl = document.getElementById('time');
+    const toggleBtn = document.getElementById('toggle');
+    const lapBtn = document.getElementById('lap');
+    const lapsEl = document.getElementById('laps');
+
+    let running = false, startAt = 0, elapsed = 0, lastLap = 0, lapCount = 0, raf = 0;
+
+    const fmt = ms => {
+      const cs = Math.floor(ms / 10) % 100;
+      const s = Math.floor(ms / 1000) % 60;
+      const m = Math.floor(ms / 60000) % 60;
+      const h = Math.floor(ms / 3600000);
+      const p = n => String(n).padStart(2, '0');
+      return { main: (h ? h + ':' : '') + p(m) + ':' + p(s), sub: '.' + p(cs) };
+    };
+    const now = () => running ? elapsed + performance.now() - startAt : elapsed;
+    const render = () => {
+      const t = fmt(now());
+      timeEl.innerHTML = t.main + '<small>' + t.sub + '</small>';
+      if (running) raf = requestAnimationFrame(render);
+    };
+    const updateButtons = () => {
+      toggleBtn.textContent = running ? 'ストップ' : 'スタート';
+      toggleBtn.classList.toggle('running', running);
+      lapBtn.textContent = !running && elapsed > 0 ? 'リセット' : 'ラップ';
+      lapBtn.disabled = !running && elapsed === 0;
+    };
+
+    function toggle() {
+      if (running) { elapsed += performance.now() - startAt; running = false; cancelAnimationFrame(raf); }
+      else { startAt = performance.now(); running = true; raf = requestAnimationFrame(render); }
+      updateButtons(); render();
+    }
+    function lap() {
+      if (!running) return;
+      const t = now();
+      lapCount++;
+      const li = document.createElement('li');
+      const d = fmt(t - lastLap), total = fmt(t);
+      li.innerHTML = `<span>ラップ ${lapCount}</span><span>${d.main}${d.sub}</span><span>${total.main}${total.sub}</span>`;
+      lapsEl.prepend(li);
+      lastLap = t;
+    }
+    function reset() {
+      if (running) return;
+      elapsed = 0; lastLap = 0; lapCount = 0; lapsEl.innerHTML = '';
+      updateButtons(); render();
+    }
+
+    toggleBtn.addEventListener('click', toggle);
+    lapBtn.addEventListener('click', () => (running ? lap() : reset()));
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space') { e.preventDefault(); toggle(); }
+      else if (e.key === 'l' || e.key === 'L') lap();
+      else if (e.key === 'r' || e.key === 'R') reset();
+    });
+  </script>
+</body>
+</html>
